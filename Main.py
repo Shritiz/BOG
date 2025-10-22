@@ -9,7 +9,7 @@ load_model(r"C:\Users\DELL\Desktop\programs\BOT\vosk-model-small-en-us-0.15")
 
 # === CHARACTER SELECTION ===
 from settings import load_character
-CHARACTER = load_character("Sofi")  # Change the character name here to switch characters
+CHARACTER = load_character("Martin")  # Change the character name here to switch characters
 CHARACTER_NAME = CHARACTER["CHARACTER_NAME"]
 CHARACTER_DESCRIPTION = CHARACTER["CHARACTER_DESCRIPTION"]
 MODEL_NAME = CHARACTER["MODEL_NAME"]
