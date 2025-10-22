@@ -1,0 +1,1 @@
+This is the main program for launching a simple terminal bot to talk with ot chat with 
