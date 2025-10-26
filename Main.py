@@ -1,15 +1,25 @@
 import google.generativeai as genai
-import json, os, edge_tts, asyncio, subprocess, unicodedata
+import json, os, edge_tts, asyncio, subprocess, unicodedata, base64, tempfile
 from playsound import playsound
 import shutil
 import re as regex
 from input_audio import load_model, get_voice_input
+from settings.settings import *
 # === Initialize Audio Model===
-load_model(r"C:\Users\DELL\Desktop\programs\BOT\vosk-model-small-en-us-0.15")
+base_dir = os.path.dirname(os.path.abspath(__file__))
+VOSK_MODEL_PATH = os.path.join(base_dir, "vosk-model-small-en-us-0.15")
+if not os.path.exists(VOSK_MODEL_PATH):
+    alt = os.path.join(os.getcwd(), "vosk-model-small-en-us-0.15")
+    if os.path.exists(alt):
+        VOSK_MODEL_PATH = alt
+    else:
+        print(f"⚠️ Vosk model not found at {VOSK_MODEL_PATH} or {alt}")
+
+load_model(VOSK_MODEL_PATH)
 
 # === CHARACTER SELECTION ===
 from settings import load_character
-CHARACTER = load_character("Martin")  # Change the character name here to switch characters
+CHARACTER = load_character("Veritas")  # Change the character name here to switch characters
 CHARACTER_NAME = CHARACTER["CHARACTER_NAME"]
 CHARACTER_DESCRIPTION = CHARACTER["CHARACTER_DESCRIPTION"]
 MODEL_NAME = CHARACTER["MODEL_NAME"]
@@ -149,22 +159,75 @@ def preprocess_text(raw: str) -> str:
 
 # === Stream TTS ===
 async def stream_tts(text: str, voice: str):
+    """
+    Write incoming audio chunks to a temporary mp3 file and start ffplay
+    once an initial buffer is filled. ffplay will read the file as it grows,
+    avoiding skipped middle chunks when the player lags.
+    """
     communicate = edge_tts.Communicate(text, voice)
-    process = subprocess.Popen(
-        ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", "-"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            process.stdin.write(chunk["data"])
-            process.stdin.flush()
-    process.stdin.close()
-    process.wait()
+
+    q = asyncio.Queue()
+    async def producer():
+        async for chunk in communicate.stream():
+            if chunk.get("type") == "audio":
+                data = chunk.get("data")
+                if isinstance(data, str):
+                    try:
+                        data = base64.b64decode(data)
+                    except Exception:
+                        data = data.encode("utf-8")
+                await q.put(data)
+        await q.put(None)
+
+    prod_task = asyncio.create_task(producer())
+
+    # temp file that ffplay can read while we append to it
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+    tmp_path = tmp.name
+    tmp.close()
+
+    START_BUFFER = 64 * 1024  # start playing after ~64KB buffered (adjustable)
+    player = None
+    try:
+        buffered = 0
+        with open(tmp_path, "ab") as f:
+            while True:
+                data = await q.get()
+                if data is None:
+                    break
+                f.write(data)
+                f.flush()
+                buffered += len(data)
+
+                if player is None and buffered >= START_BUFFER:
+                    # start ffplay reading the growing file
+                    player = subprocess.Popen(
+                        ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", tmp_path],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+
+        # ensure producer finished
+        await prod_task
+
+        # wait for player to finish playing the file
+        if player:
+            player.wait()
+        else:
+            # If audio was very short and player never started, play once synchronously
+            subprocess.run(
+                ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", tmp_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
 
 # === Initialize TTS ===
-STREAM_TTS = True
+STREAM_TTS = Stream_TTS_Setting  
 async def speak(text):
     voice = MODEL_VOICE
     if STREAM_TTS:
@@ -198,7 +261,7 @@ def main():
     #print("Press Alt+P to start/stop recording. Press Esc to quit.")
     #print("press 'p' to pause/resume, 's' to stop")
     print("=" * columns,"\n")
-    voice = False # toggle voice input
+    voice = VOICE_SETTING
     while True:
         try:
             print("=" * columns,"\n")
