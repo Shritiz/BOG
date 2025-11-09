@@ -200,10 +200,13 @@ def main():
     voice_mode = VOICE_SETTING
     context_buffer = []
     while True:
+        
+        columns = shutil.get_terminal_size().columns
         try:
             # Get user input (voice or text)
             if voice_mode:
                 user_input = get_voice_input("🎙️ Press Alt+P to speak your message...")
+                print("="*columns)
                 print(f"You: {user_input}")
             else:
                 user_input = input("You: ").strip()
@@ -264,6 +267,7 @@ def main():
                     reply2 = regex.sub(r'\*', '', reply2)
                     reply2 = regex.sub(r'["]', '"', reply2)
                     reply2 = preprocess_text(reply2)
+                    print("="*columns)
                     print(f"{bot_name}: {reply2}")
                     try:
                         asyncio.run(speak(bot_name, reply2))
