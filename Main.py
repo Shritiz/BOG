@@ -3,7 +3,7 @@ import json, os, edge_tts, asyncio, subprocess, unicodedata, base64, tempfile
 from playsound import playsound
 import shutil
 import re as regex
-from input_audio import load_model, get_voice_input
+from dependancy.input_audio import load_model, get_voice_input
 from settings.settings import *
 # === Initialize Audio Model===
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,7 +19,7 @@ load_model(VOSK_MODEL_PATH)
 
 # === CHARACTER SELECTION ===
 from settings import load_character
-CHARACTER = load_character("Veritas")  # Change the character name here to switch characters
+CHARACTER = load_character("Baruch Spinoza")  # Change the character name here to switch characters
 CHARACTER_NAME = CHARACTER["CHARACTER_NAME"]
 CHARACTER_DESCRIPTION = CHARACTER["CHARACTER_DESCRIPTION"]
 MODEL_NAME = CHARACTER["MODEL_NAME"]
@@ -33,7 +33,8 @@ except KeyError:
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 # === File Paths ===
-MEMORY_DIR = os.path.join(os.getcwd(), "memory")
+DOCUMENTS_DIR = os.path.join(os.path.expanduser("~"), "Documents")
+MEMORY_DIR = os.path.join(DOCUMENTS_DIR, "memory")
 os.makedirs(MEMORY_DIR, exist_ok=True)
 HISTORY_FILE = os.path.join(
     MEMORY_DIR,
